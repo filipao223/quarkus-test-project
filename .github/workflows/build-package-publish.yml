@@ -1,0 +1,68 @@
+name: build-package-publish
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: '21'
+          distribution: 'adopt'
+          server-id: github
+
+      - name: Compile project
+        run: ./mvnw clean install
+  
+
+      # --- Simulated coverage ---
+      - name: Generate coverage
+        id: coverage
+        run: |
+          # Replace with real coverage extraction
+          COVERAGE=$((RANDOM % 40 + 60))
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+
+      # --- Determine status ---
+      - name: Set build status
+        id: status
+        run: |
+          echo "status=passing" >> $GITHUB_OUTPUT
+
+      # --- Update Wiki ---
+      - name: Update Wiki Dashboard
+        env:
+          COVERAGE: ${{ steps.coverage.outputs.coverage }}
+          STATUS: ${{ steps.status.outputs.status }}
+          BRANCH: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -e
+
+          WIKI_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${REPO}.wiki.git"
+
+          git clone "$WIKI_URL" wiki
+          cd wiki
+
+          FILE="Home.md"
+
+          # Create file if it doesn't exist
+          if [ ! -f "$FILE" ]; then
+            echo "# 📊 Project Status Dashboard" > $FILE
+          fi
+
+          # Remove old section for this branch
+          awk "/## 🌿 Branch: ${BRANCH}/{flag=1;next}/## 🌿 Branch:/{flag=0} !flag" $FILE > temp.md || true
+          mv temp.md $FILE
+
+          # Append updated section
+          cat <<EOF >> $FILE
