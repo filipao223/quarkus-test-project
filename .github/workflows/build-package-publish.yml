@@ -22,7 +22,7 @@ jobs:
           server-id: github
 
       - name: Compile project
-        run: ./my-quarkus-app/mvnw clean install
+        run: ./mvnw clean install
 
       # --- Simulated coverage ---
       - name: Generate coverage
