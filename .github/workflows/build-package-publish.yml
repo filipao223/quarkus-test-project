@@ -58,19 +58,37 @@ jobs:
 
           # Ensure file exists
           if [ ! -f "$FILE" ]; then
-            echo "# 📊 Project Status Dashboard" > $FILE
-            echo "" >> $FILE
+            echo "# 📊 Project Status Dashboard" > "$FILE"
+            echo "" >> "$FILE"
           fi
 
-          # Create new section content
-          SECTION=$(cat <<EOF
-          ## 🌿 Branch: ${BRANCH}
+          # Remove existing section for this branch
+          if grep -q "## 🌿 Branch: ${BRANCH}" "$FILE"; then
+            awk -v branch="## 🌿 Branch: ${BRANCH}" '
+              $0 == branch {skip=1; next}
+              /^## 🌿 Branch:/ {skip=0}
+              !skip {print}
+            ' "$FILE" > temp.md
+            mv temp.md "$FILE"
+          fi
 
-          ### Build Status
-            ![Build Status](https://github.com/${REPO}/actions/workflows/build-package-publish.yml/badge.svg?branch=${BRANCH})
-            
-            ### Code Coverage
-            ![Coverage](https://img.shields.io/badge/coverage-${COVERAGE}%25-${COLOR}?style=flat)
-            
-            EOF
-          )
+          # Append updated section (NO indentation!)
+          echo "## 🌿 Branch: ${BRANCH}" >> "$FILE"
+          echo "" >> "$FILE"
+          echo "### Build Status" >> "$FILE"
+          echo "![Build Status](https://github.com/${REPO}/actions/workflows/build-package-publish.yml/badge.svg?branch=${BRANCH})" >> "$FILE"
+          echo "" >> "$FILE"
+          echo "### Code Coverage" >> "$FILE"
+          echo "![Coverage](https://img.shields.io/badge/coverage-${COVERAGE}%25-${COLOR}?style=flat)" >> "$FILE"
+          echo "" >> "$FILE"
+
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          git add "$FILE"
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Update status for ${BRANCH}"
+            git pull --rebase || true
+            git push
+          fi
