@@ -8,7 +8,8 @@ on:
 jobs:
   compile:
     runs-on: ubuntu-latest
-
+    outputs:
+      coverage-badge: ${{ steps.badge-output.outputs.coverage-badge }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -22,7 +23,6 @@ jobs:
 
       - name: Compile project
         run: ./mvnw clean install
-  
 
       # --- Simulated coverage ---
       - name: Generate coverage
@@ -39,30 +39,38 @@ jobs:
           echo "status=passing" >> $GITHUB_OUTPUT
 
       # --- Update Wiki ---
-      - name: Update Wiki Dashboard
+      - name: Update Wiki
         env:
-          COVERAGE: ${{ steps.coverage.outputs.coverage }}
-          STATUS: ${{ steps.status.outputs.status }}
-          BRANCH: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          COVERAGE: ${{ steps.coverage.outputs.coverage }}
+          COLOR: ${{ steps.color.outputs.color }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
 
-          WIKI_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${REPO}.wiki.git"
+          WIKI_URL="https://x-access-token:${TOKEN}@github.com/${REPO}.wiki.git"
 
           git clone "$WIKI_URL" wiki
           cd wiki
 
           FILE="Home.md"
 
-          # Create file if it doesn't exist
+          # Ensure file exists
           if [ ! -f "$FILE" ]; then
             echo "# 📊 Project Status Dashboard" > $FILE
+            echo "" >> $FILE
           fi
 
-          # Remove old section for this branch
-          awk "/## 🌿 Branch: ${BRANCH}/{flag=1;next}/## 🌿 Branch:/{flag=0} !flag" $FILE > temp.md || true
-          mv temp.md $FILE
+          # Create new section content
+          SECTION=$(cat <<EOF
+          ## 🌿 Branch: ${BRANCH}
 
-          # Append updated section
-          cat <<EOF >> $FILE
+          ### Build Status
+            ![Build Status](https://github.com/${REPO}/actions/workflows/build-package-publish.yml/badge.svg?branch=${BRANCH})
+            
+            ### Code Coverage
+            ![Coverage](https://img.shields.io/badge/coverage-${COVERAGE}%25-${COLOR}?style=flat)
+            
+            EOF
+          )
