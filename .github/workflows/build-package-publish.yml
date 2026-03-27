@@ -1,6 +1,7 @@
 name: build-package-publish
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - '**'
